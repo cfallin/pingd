@@ -1,0 +1,11 @@
+[package]
+name = "pingd"
+version = "0.1.0"
+authors = ["Chris Fallin <cfallin@c1f.net>"]
+
+[dependencies]
+oping = "0.2"
+rusqlite = "0.6"
+iron = "0.2"
+time = "*"
+crossbeam = "*"
