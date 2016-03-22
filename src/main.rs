@@ -1,3 +1,5 @@
+#![feature(slice_concat_ext)]
+
 extern crate oping;
 extern crate iron;
 extern crate rusqlite;
@@ -14,6 +16,7 @@ use iron::middleware::Handler;
 use iron::headers::ContentType;
 use iron::mime::{Mime, TopLevel, SubLevel};
 use std::path::Path;
+use std::slice::SliceConcatExt;
 
 type DBConn = Arc<Mutex<rusqlite::Connection>>;
 
@@ -80,20 +83,37 @@ struct PageHandler {
 impl Handler for PageHandler {
     fn handle(&self, r: &mut Request) -> IronResult<Response> {
         let path = &r.url.path;
-        let limit = if path.len() > 0 && path[0].len() > 0 {
+        println!("GET /{}", path.join("/"));
+        let (limit, only_missing) = if path.len() > 0 && path[0].len() > 0 {
             if path[0] == "all" {
-                None
+                (None, false)
             } else if let Ok(i) = path[0].parse() {
-                Some(i)
+                (Some(i), false)
+            } else if path[0] == "missing" {
+                let limit = if path.len() > 1 {
+                    if let Ok(i) = path[1].parse() {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                (limit, true)
             } else {
                 return Ok(Response::with((status::NotFound, "404 Not Found")));
             }
         } else {
-            Some(600) // default.
+            (Some(600), false) // default.
         };
 
         let l = self.db.lock().unwrap();
-        let sql = format!("SELECT host, t, missing, latency_ms FROM pings ORDER BY t DESC {}",
+        let sql = format!("SELECT host, t, missing, latency_ms FROM pings {} ORDER BY t DESC {}",
+                          if only_missing {
+                              "WHERE missing=1"
+                          } else {
+                              ""
+                          },
                           if let Some(l) = limit {
                               format!("LIMIT {}", l)
                           } else {
